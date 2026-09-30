@@ -27,17 +27,19 @@ export default function Index() {
 
   return (
     <View style={[styles.container, { backgroundColor: dark ? "#000" : "#fff" }]}>
-      <Text style={[styles.title, { color: textColor }]}>My Pantry</Text>
-      <View style={styles.row}>
-        <TextInput
-          style={[styles.input, { color: textColor }]}
-          placeholder="Add an ingredient"
-          placeholderTextColor="#888"
-          value={ingredient}
-          onChangeText={setIngredient}
-          onSubmitEditing={addIngredient}
-        />
-        <Button title="Add" onPress={addIngredient} />
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: textColor }]}>My Pantry</Text>
+        <View style={styles.row}>
+          <TextInput
+            style={[styles.input, { color: textColor }]}
+            placeholder="Add an ingredient"
+            placeholderTextColor="#888"
+            value={ingredient}
+            onChangeText={setIngredient}
+            onSubmitEditing={addIngredient}
+          />
+          <Button title="Add" onPress={addIngredient} />
+        </View>
       </View>
       <IngredientGraph ingredients={ingredients} />
     </View>
@@ -45,7 +47,8 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, paddingTop: 80 },
+  container: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingTop: 80 },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 16 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   input: { flex: 1, borderWidth: 1, borderColor: "#999", padding: 10 },
