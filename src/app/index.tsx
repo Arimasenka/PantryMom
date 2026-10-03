@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  Button, FlatList, Pressable, StyleSheet,
+  Button, FlatList, LayoutAnimation, Pressable, StyleSheet,
   Text, TextInput,
   useColorScheme,
   View,
@@ -32,6 +32,7 @@ export default function Index() {
   }
 
   function removeIngredient(key: string) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // rows below slide up
     setIngredients((prev) => prev.filter((i) => i !== key));
   }
 
