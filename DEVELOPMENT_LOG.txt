@@ -1,0 +1,192 @@
+PANTRYMOM - DEVELOPMENT LOG
+===========================
+
+What the app is
+  A mobile iOS app (Expo / React Native, Expo SDK 57, Expo Router) that knows which
+  ingredients you have at home and can come up with recipes from just those ingredients.
+  Planned: saved past recipes, easy entry for new groceries, prompting the user for
+  recipe criteria, and (later) saved user preferences.
+
+How to read this log
+  Newest version first. Every version lists:
+    - Git tag and commit (the tag is the version number)
+    - MAJOR CHANGES: the headline points only
+    - DETAILS: how it was done, files touched, decisions, and known limits
+  This file is updated after each backup/tag. Its own commit is not listed (a file
+  cannot contain the hash of the commit that stores it).
+
+
+VERSION INDEX
+-------------
+  Tag    Commit    Date        Summary
+  1.03   7c2f37a   2026-10-03  Swipe-to-delete rebuilt on gesture-handler, iOS-style
+  1.02   cc1cb18   2026-10-03  List mode, remove mode (menu), first swipe-to-delete, haptics
+  1.01   cfd42e3   2026-09-30  Pinch zoom, pan, full-width graph
+  1.0    8f6013b   2026-09-30  Ingredient mind map, first version
+
+
+==============================================================================
+VERSION 1.03   (tag: 1.03, commit: 7c2f37a, 2026-10-03)
+Rebuild swipe-to-delete with gesture-handler swipeable and iOS-style haptic
+==============================================================================
+
+MAJOR CHANGES
+  - Swipe-to-delete rebuilt on react-native-gesture-handler's swipeable (modeled on
+    iOS Messages) instead of hand-written drag code.
+  - Red bar fills in from the right as a row is dragged left; a white X appears at its
+    left end once the delete point is passed; letting go there deletes the row.
+  - Small haptic tap when the delete point is crossed.
+  - Deleted rows collapse with a short animation.
+
+DETAILS
+  - src/components/swipe-to-delete-row.tsx (rewritten): uses ReanimatedSwipeable from
+    react-native-gesture-handler. The red action panel is as wide as the row; a
+    derived value ("armed") flips when the drag passes 40% of the screen width, which
+    drives the X (fade + scale in) and the haptic.
+  - Haptic: expo-haptics, ImpactFeedbackStyle.Light, fired once per crossing into the
+    delete zone. Callback goes UI thread -> JS via scheduleOnRN (react-native-worklets,
+    the Reanimated 4 way; runOnJS is the older name).
+  - The swipeable's rightThreshold uses the same 40% value, so the snap point and the
+    X/haptic point match. Full swipe past it = delete (like Messages).
+  - src/app/_layout.tsx: whole app wrapped in GestureHandlerRootView (required for
+    gesture-handler gestures to work).
+  - src/app/index.tsx: LayoutAnimation (easeInEaseOut) before removing an item so the
+    rows below slide up.
+  - Remove mode is still list-only and swipes only work while it is on (from 1.02).
+  - Known differences from real iOS: a fast flick can delete before the X shows (the
+    library adds flick speed to drag distance on release); no tap-to-confirm Delete
+    button once swiped.
+  - Not run on a device when written; the 40% point and Light haptic are easy to tune.
+
+
+==============================================================================
+VERSION 1.02   (tag: 1.02, commit: cc1cb18, 2026-10-03)
+Add list mode, remove mode with swipe-to-delete and haptics
+==============================================================================
+
+MAJOR CHANGES
+  - Plain list view added, with a List/Map toggle button next to the entry bar.
+  - Three-dots (...) options menu with a "Remove mode".
+  - Remove mode is list-view only; first version of swipe-left-to-delete.
+  - Haptic feedback added (expo-haptics).
+
+DETAILS
+  - src/app/index.tsx: ViewMode ("map" | "list"). The map stays mounted but hidden
+    (display: none) while in list view so its layout, zoom and pan survive toggling.
+  - List rows show the ingredient emoji (or first letter for unknown ones) and name,
+    themed for light/dark mode.
+  - Options menu: dropdown under the title row with a tap-outside backdrop. In map view
+    the "Remove mode" item is greyed with a "List view only" note; switching to the map
+    turns remove mode off automatically.
+  - A red banner under the entry bar shows while remove mode is on, with a Done button.
+  - An earlier tap-to-remove version (also on the map) was tried during this work and
+    removed; the map is untouched by remove mode.
+  - First swipe implementation was hand-written (PanResponder + Animated): red fill
+    from the right, X past 40%, haptic on crossing. Replaced in 1.03.
+  - src/components/swipe-to-delete-row.tsx created here; expo-haptics installed via
+    npx expo install (bundled in Expo Go, no new native build needed).
+  - StyleSheet.absoluteFillObject no longer exists in React Native 0.86; explicit
+    absolute positioning is used for the menu backdrop.
+
+
+==============================================================================
+VERSION 1.01   (tag: 1.01, commit: cfd42e3, 2026-09-30)
+Add pinch zoom, pan and full-width graph view
+==============================================================================
+
+MAJOR CHANGES
+  - Pinch to zoom, with low zoom sensitivity and effectively unlimited zoom-out.
+  - Pan the map freely, including out into empty space.
+  - Labels fade out and icons shrink to plain dots as you zoom out.
+  - Graph area now runs edge to edge; its top stays below the entry bar.
+
+DETAILS
+  - src/components/ingredient-graph.tsx: a camera (scale, tx, ty) over the simulation;
+    screen position = world position * scale + offset. The simulation still runs in
+    world space.
+  - Gestures via PanResponder: one finger drags a node (or pans if you miss every
+    node); two fingers pinch-zoom and pan together, keeping the point under your
+    fingers fixed. Lifting one finger after a pinch continues as a pan.
+  - Zoom: scale change = (finger spread ratio) ^ 0.5 for gentle zoom; scale clamped to
+    0.02 (about unlimited out) to 4 (in).
+  - Zoom-out fades: labels fade between 90% and 50% scale; the emoji fade into plain
+    dots once nodes get small; node and string sizes shrink with scale.
+  - Hit testing happens in screen space with a minimum radius so tiny nodes stay grabbable.
+  - Nodes are no longer clamped inside the box; a gentle pull toward the center keeps
+    the graph together.
+  - src/app/index.tsx: header (title + entry bar) padded, graph container full width.
+
+
+==============================================================================
+VERSION 1.0    (tag: 1.0, commit: 8f6013b, 2026-09-30)
+Ingredient mind map, first version
+==============================================================================
+
+MAJOR CHANGES
+  - Project created from the Expo starter (Expo SDK 57, Expo Router, TypeScript).
+  - Ingredient entry bar and pantry screen.
+  - Pantry shown as an Obsidian-style force-directed graph ("mind map") of ingredient
+    nodes, with strings linking each ingredient to its closest related ingredients.
+  - Related ingredients decided by shared usage groups.
+
+DETAILS
+  - Before the first commit, a simple list screen was built (useState list + text
+    input) and a dark-mode bug fixed: text and background colors are now set
+    explicitly for light and dark mode (phone dark mode made black text unreadable).
+  - src/lib/ingredient-data.ts: table of ~55 ingredients, each with an emoji icon and
+    usage groups (breakfast, baking, pasta, stir-fry, mexican, soup, salad, grill,
+    dessert, sandwich, fried-rice). relatedness(a, b) = number of shared groups;
+    buildEdges links each ingredient to its top 2 relatives. Names are normalized
+    ("Eggs", "egg", "tomatoes" -> "tomato"). Unknown ingredients get a letter icon and
+    no strings, so they just float. This is the piece to replace with AI-based links.
+  - src/components/ingredient-graph.tsx: custom force simulation (pairwise repulsion,
+    spring along strings, center gravity, damping, cooling), run with
+    requestAnimationFrame until it settles and restarted on any change. Strings drawn
+    with react-native-svg (already bundled in SDK 57); nodes are absolutely positioned
+    views. No graph library, to keep dependencies small.
+  - Nodes can be dragged; new ingredients spawn near the center and float until linked.
+  - Dark Obsidian-style palette for the graph (purple node rings, grey strings).
+  - Duplicate ingredients are ignored.
+  - Local git repository set up in the project folder (a stray empty repo in the user
+    folder was left alone). No GitHub remote exists yet; backups are local only.
+
+
+==============================================================================
+NOT IN A TAGGED VERSION
+==============================================================================
+
+Local safeguards (outside the commits)
+  - .git/hooks/pre-commit: blocks any commit with a staged filename starting with .env,
+    or staged changes containing the Anthropic API key prefix ("sk" + "-ant-"). Prints a clear
+    message and never prints the key. Tested. Local only: not shared with clones, and
+    "git commit --no-verify" skips it.
+  - .env.local is gitignored (.env*.local).
+
+Reverted experiment: "Make Recipe" (Phase 3, AI recipes)  - never committed
+  - Goal: Make Recipe button -> Expo Router API route (server side) -> Claude API
+    (claude-haiku-4-5-20251001, key from ANTHROPIC_API_KEY in .env.local) -> 3 recipes
+    as JSON (title, time, ingredients used, extra ingredients needed, steps).
+  - It was built (API route, recipe panel, shared types, @anthropic-ai/sdk install,
+    apiRoutes plugin option in app.json) but after it the app could no longer connect
+    to the phone, so it was fully undone. The root cause was never confirmed (best
+    guess: the apiRoutes setting in app.json or the dev server picking up config
+    changes mid-run).
+  - Plan for the retry: add the server route first, confirm the app still connects,
+    then add the button. API routes in SDK 57 with static web output need
+    ["expo-router", { "apiRoutes": true }] in app.json plus a server restart.
+
+Working notes
+  - Dev server: run "npx expo start" in the project folder; if the app will not
+    connect, restart with "npx expo start --clear".
+  - Lint (npx expo lint) cannot run: eslint is not installed in the project. Typecheck
+    (npx tsc --noEmit) is used as the check.
+  - Untracked file claude.md exists in the project root; it was not created by the
+    assistant and has not been committed.
+
+
+OPEN ITEMS / NEXT IDEAS
+  - Persist the pantry to the phone (AsyncStorage) so it survives closing the app.
+  - Redo Phase 3: AI recipe suggestions via a server API route, in smaller steps.
+  - Saved recipes, grocery entry shortcuts, recipe criteria prompts, user preferences.
+  - Replace relatedness() with AI-based ingredient relations.
+  - Set up a private GitHub remote for an off-computer backup.
