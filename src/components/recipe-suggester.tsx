@@ -1,9 +1,12 @@
+import * as Haptics from "expo-haptics";
 import { useState } from "react";
 import {
-  ActivityIndicator, Button, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View,
+  ActivityIndicator, Button, Pressable, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View,
 } from "react-native";
 
+import { useSavedRecipes } from "@/hooks/use-saved-recipes";
 import { MAX_REQUEST_LENGTH, type Recipe, type SuggestResponse } from "@/lib/recipe-types";
+import { recipeId } from "@/lib/saved-recipes";
 
 // "Chef's request" box + "Suggest recipes" button + the recipe cards. It only talks to our
 // own /suggest route; the Claude API key lives on the server and never reaches this file.
@@ -13,7 +16,9 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
   const muted = dark ? "#aaa" : "#555";
   const border = dark ? "#333" : "#ddd";
 
+  const { savedIds, save, remove } = useSavedRecipes();
   const [request, setRequest] = useState("");
+  const [usedRequest, setUsedRequest] = useState(""); // the request the shown recipes were made for
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +35,7 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.error ?? "Something went wrong. Please try again.");
       setRecipes((data as SuggestResponse).recipes);
+      setUsedRequest(request.trim());
     } catch (e) {
       // A thrown TypeError means we never reached the server (offline, server down).
       setError(
@@ -39,6 +45,17 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Heart tapped: save the recipe (with its chef's request and today's date), or un-save it.
+  function toggleSaved(recipe: Recipe) {
+    const id = recipeId(recipe);
+    if (savedIds.has(id)) {
+      remove(id);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      save(recipe, usedRequest);
     }
   }
 
@@ -67,7 +84,24 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
         <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent}>
           {recipes.map((r, i) => (
             <View key={`${r.title}-${i}`} style={[styles.card, { borderColor: border }]}>
-              <Text style={[styles.cardTitle, { color: textColor }]}>{r.title}</Text>
+              <View style={styles.cardHeader}>
+                <Text style={[styles.cardTitle, { color: textColor }]}>{r.title}</Text>
+                <Pressable
+                  onPress={() => toggleSaved(r)}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    savedIds.has(recipeId(r))
+                      ? `Remove ${r.title} from saved recipes`
+                      : `Save ${r.title}`
+                  }
+                  accessibilityState={{ selected: savedIds.has(recipeId(r)) }}
+                >
+                  <Text style={[styles.heart, { color: savedIds.has(recipeId(r)) ? "#ff3b30" : muted }]}>
+                    {savedIds.has(recipeId(r)) ? "♥" : "♡"}
+                  </Text>
+                </Pressable>
+              </View>
               <Text style={{ color: muted }}>⏱ {r.time}</Text>
               <Text style={[styles.heading, { color: textColor }]}>Uses</Text>
               <Text style={{ color: textColor }}>{r.ingredientsUsed.join(", ")}</Text>
@@ -99,6 +133,8 @@ const styles = StyleSheet.create({
   results: { maxHeight: 260, marginTop: 8 },
   resultsContent: { gap: 10, paddingBottom: 12 },
   card: { borderWidth: 1, borderRadius: 10, padding: 12, gap: 2 },
-  cardTitle: { fontSize: 18, fontWeight: "bold" },
+  cardHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 },
+  cardTitle: { fontSize: 18, fontWeight: "bold", flex: 1 },
+  heart: { fontSize: 26, lineHeight: 28 },
   heading: { fontWeight: "600", marginTop: 6 },
 });

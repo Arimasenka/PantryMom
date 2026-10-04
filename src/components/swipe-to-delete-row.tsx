@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { ReactNode } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   SharedValue,
@@ -20,10 +20,17 @@ function pop() {
 }
 
 // The red bar revealed behind the row. It is as wide as the row, so it fills in from the
-// right as you drag, and the white ✕ sits at its left end, i.e. right where your finger is.
+// right as you drag, and the white ✕ (plus an optional word) sits at its left end, i.e.
+// right where your finger is.
 function DeleteAction({
-  translation, width, threshold,
-}: { translation: SharedValue<number>; width: number; threshold: number }) {
+  translation, width, threshold, label, accessibilityLabel,
+}: {
+  translation: SharedValue<number>;
+  width: number;
+  threshold: number;
+  label?: string;
+  accessibilityLabel: string;
+}) {
   const armed = useDerivedValue(() => -translation.value >= threshold);
 
   // One small haptic tap each time you drag past the delete point.
@@ -34,14 +41,22 @@ function DeleteAction({
     },
   );
 
-  const xStyle = useAnimatedStyle(() => ({
+  const markStyle = useAnimatedStyle(() => ({
     opacity: withTiming(armed.value ? 1 : 0, { duration: 120 }),
     transform: [{ scale: withTiming(armed.value ? 1 : 0.6, { duration: 120 }) }],
   }));
 
   return (
-    <View style={[styles.action, { width }]}>
-      <Animated.Text style={[styles.x, xStyle]}>✕</Animated.Text>
+    <View
+      style={[styles.action, { width }]}
+      accessible
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <Animated.View style={[styles.mark, markStyle]}>
+        <Text style={styles.x}>✕</Text>
+        {label ? <Text style={styles.label}>{label}</Text> : null}
+      </Animated.View>
     </View>
   );
 }
@@ -50,11 +65,16 @@ type Props = {
   children: ReactNode;
   enabled: boolean;
   onDelete: () => void;
+  label?: string; // word shown next to the ✕, e.g. "Delete"
+  accessibilityLabel?: string; // what a screen reader calls the delete action
+  deleteHaptic?: Haptics.ImpactFeedbackStyle; // optional extra haptic when the delete happens
 };
 
 // iOS-style swipe action (like Messages): drag a row left, red fills in from the right,
 // pass the delete point and a ✕ + haptic tap appear; release there to delete the row.
-export function SwipeToDeleteRow({ children, enabled, onDelete }: Props) {
+export function SwipeToDeleteRow({
+  children, enabled, onDelete, label, accessibilityLabel = "Delete", deleteHaptic,
+}: Props) {
   const { width } = useWindowDimensions();
   const threshold = width * THRESHOLD_RATIO;
 
@@ -65,9 +85,18 @@ export function SwipeToDeleteRow({ children, enabled, onDelete }: Props) {
       friction={1}
       rightThreshold={threshold}
       renderRightActions={(_progress, translation) => (
-        <DeleteAction translation={translation} width={width} threshold={threshold} />
+        <DeleteAction
+          translation={translation}
+          width={width}
+          threshold={threshold}
+          label={label}
+          accessibilityLabel={accessibilityLabel}
+        />
       )}
-      onSwipeableOpen={() => onDelete()}
+      onSwipeableOpen={() => {
+        if (deleteHaptic !== undefined) Haptics.impactAsync(deleteHaptic);
+        onDelete();
+      }}
     >
       {children}
     </ReanimatedSwipeable>
@@ -76,5 +105,7 @@ export function SwipeToDeleteRow({ children, enabled, onDelete }: Props) {
 
 const styles = StyleSheet.create({
   action: { backgroundColor: DELETE_RED, justifyContent: "center", alignItems: "flex-start" },
-  x: { color: "#fff", fontSize: 22, fontWeight: "600", paddingLeft: 24 },
+  mark: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 24 },
+  x: { color: "#fff", fontSize: 22, fontWeight: "600" },
+  label: { color: "#fff", fontSize: 17, fontWeight: "600" },
 });

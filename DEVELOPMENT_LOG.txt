@@ -32,8 +32,9 @@ Git rules (from claude.md in the project root, written by the user)
 VERSION INDEX
 -------------
   Tag    Commit    Date        Summary
-  1.05   (this     2026-10-04  Pantry list saved on the phone (AsyncStorage)
+  1.06   (this     2026-10-04  My Recipes: heart to save, Saved tab, delete mode, shared menu
          commit)
+  1.05   1428c9e   2026-10-04  Pantry list saved on the phone (AsyncStorage)
   1.04   239c889   2026-10-03  AI recipe suggestions (Phase 3): server route + Claude Haiku
                                + "Suggest recipes" UI
   1.03   7c2f37a   2026-10-03  Swipe-to-delete rebuilt on gesture-handler, iOS-style
@@ -43,7 +44,57 @@ VERSION INDEX
 
 
 ==============================================================================
-VERSION 1.05   (tag: 1.05, commit: the commit that contains this entry, 2026-10-04)
+VERSION 1.06   (tag: 1.06, commit: the commit that contains this entry, 2026-10-04)
+My Recipes: save recipes with a heart, Saved tab, delete mode
+==============================================================================
+
+MAJOR CHANGES
+  - Heart button on every recipe card saves the recipe (with the chef's request and the
+    date) on the phone; tap the filled heart to remove it.
+  - New Saved tab ("My Recipes"), newest first, tap a recipe to expand it.
+  - Delete mode on the Saved list: swipe a recipe left to delete it (red bar, haptics).
+  - "My Recipes" added to the three-dots menu on Home; the menu is now shared by both
+    screens.
+  - The starter "Explore" tab was replaced by the Saved tab.
+
+DETAILS
+  - src/lib/saved-recipes.ts (new): storage under the key "saved.recipes", all
+    read/write in try/catch. A recipe's id is a content fingerprint (cyrb53 hash of
+    title, time, ingredients, steps), so the same recipe cannot be saved twice and
+    different recipes get different ids. If storage cannot be READ, writes are skipped
+    (returns null) so a failed read never overwrites real data. Loaded data is
+    validated; newest first by savedAt.
+  - src/hooks/use-saved-recipes.ts (new): gives a screen the saved list and
+    save/remove actions; re-reads storage on every screen focus (both tabs stay mounted)
+    so the Home hearts and the Saved list agree; removal updates the screen immediately.
+  - src/components/options-menu.tsx (new): the three-dots button and dropdown (in a
+    Modal, anchored under the button, tap outside to close). Replaced the inline menu
+    in index.tsx.
+  - src/app/saved.tsx (new): header with title + menu (Delete mode), red banner while
+    in delete mode, list rows showing title, time, save date and chef's request, tap to
+    expand ingredients and steps, empty-state message.
+  - src/components/swipe-to-delete-row.tsx: added optional label ("Delete" next to the
+    X), accessibilityLabel, and deleteHaptic (a stronger haptic when the delete
+    happens; Heavy on the Saved list). The pantry swipe behaves as before. Built on
+    gesture-handler's ReanimatedSwipeable (the current Swipeable), full-swipe deletes.
+  - src/components/recipe-suggester.tsx: heart on each card (accessibility labels
+    "Save <title>" / "Remove <title> from saved recipes"), light haptic on save. The
+    chef's request saved is the one the shown recipes were generated for, not the
+    current text box.
+  - src/app/index.tsx: uses OptionsMenu; menu items "My Recipes" (navigates to the
+    Saved tab) and "Remove mode" (list view only).
+  - Tabs: app-tabs.tsx / app-tabs.web.tsx now point at "saved" (iOS heart symbol icon;
+    no Android icon). src/app/explore.tsx (starter filler) deleted.
+  - VoiceOver: each Saved row gets a Delete action while delete mode is on.
+  - No new packages (AsyncStorage, expo-haptics, gesture-handler already installed).
+  - Verified: typecheck, full iOS export builds. Not yet checked on a device when
+    written.
+  - Tried and reverted before this commit: a swipe-down bottom sheet with a gray pill
+    grabber for the recipe panel (never committed; the user asked to undo it).
+
+
+==============================================================================
+VERSION 1.05   (tag: 1.05, commit: 1428c9e, 2026-10-04)
 Persist the ingredient list on the phone
 ==============================================================================
 
