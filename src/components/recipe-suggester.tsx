@@ -1,15 +1,18 @@
 import * as Haptics from "expo-haptics";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
-  ActivityIndicator, Button, Pressable, ScrollView, StyleSheet, Text, TextInput, useColorScheme, View,
+  ActivityIndicator, Animated, Button, Keyboard, LayoutAnimation, PanResponder, Pressable,
+  ScrollView, StyleSheet, Text, TextInput, useColorScheme, View,
 } from "react-native";
 
 import { useSavedRecipes } from "@/hooks/use-saved-recipes";
 import { MAX_REQUEST_LENGTH, type Recipe, type SuggestResponse } from "@/lib/recipe-types";
 import { recipeId } from "@/lib/saved-recipes";
 
-// "Chef's request" box + "Suggest recipes" button + the recipe cards. It only talks to our
-// own /suggest route; the Claude API key lives on the server and never reaches this file.
+// "Chef's request" box + "Suggest recipes" button + the recipe cards, at the bottom of the
+// Home screen. Swipe the gray pill at its top down to hide it; swipe up (or tap the pill)
+// to bring it back. It only talks to our own /suggest route; the Claude API key lives on
+// the server and never reaches this file.
 export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
   const dark = useColorScheme() === "dark";
   const textColor = dark ? "#fff" : "#000";
@@ -22,6 +25,48 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Collapsed = only the pill bar is showing. `drag` is how far the panel is being pulled
+  // down right now (it follows the finger).
+  const [collapsed, setCollapsed] = useState(false);
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
+  const drag = useRef(new Animated.Value(0)).current;
+
+  function setPanelCollapsed(next: boolean) {
+    Keyboard.dismiss();
+    drag.setValue(0);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // smooth resize
+    setCollapsed(next);
+  }
+
+  function springBack() {
+    Animated.spring(drag, { toValue: 0, useNativeDriver: false, bounciness: 0 }).start();
+  }
+
+  // Touch handling for the pill area. Open: dragging down follows your finger, and letting
+  // go after a long (or fast) enough pull hides the panel; otherwise it springs back.
+  // Hidden: a tap or an upward swipe brings it back.
+  const grabber = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_e, g) => {
+        if (!collapsedRef.current) drag.setValue(Math.max(0, g.dy));
+      },
+      onPanResponderRelease: (_e, g) => {
+        if (collapsedRef.current) {
+          const tapped = Math.abs(g.dx) < 8 && Math.abs(g.dy) < 8;
+          if (tapped || g.dy < -30) setPanelCollapsed(false);
+        } else if (g.dy > 70 || g.vy > 0.8) {
+          setPanelCollapsed(true);
+        } else {
+          springBack();
+        }
+      },
+      onPanResponderTerminate: springBack,
+    }),
+  ).current;
 
   async function suggest() {
     setLoading(true);
@@ -45,6 +90,9 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
       );
     } finally {
       setLoading(false);
+      // Generation is done: close the keyboard so the results aren't hidden behind it and
+      // the panel settles at its normal height.
+      Keyboard.dismiss();
     }
   }
 
@@ -59,9 +107,35 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
     }
   }
 
+  // The pill and the swipe only exist once there are recipes to look at.
+  const hasRecipes = recipes.length > 0;
+  const isCollapsed = hasRecipes && collapsed;
+
   return (
-    <View style={styles.panel}>
-      <Text style={[styles.label, { color: textColor }]}>Chef's request (optional)</Text>
+    <Animated.View style={[styles.panel, { transform: [{ translateY: drag }] }]}>
+      <View
+        {...(hasRecipes ? grabber.panHandlers : {})}
+        style={hasRecipes ? styles.grabber : undefined}
+        accessible={hasRecipes}
+        accessibilityRole={hasRecipes ? "button" : undefined}
+        accessibilityLabel={hasRecipes ? (isCollapsed ? "Show recipe panel" : "Hide recipe panel") : undefined}
+        accessibilityHint={
+          hasRecipes ? (isCollapsed ? "Swipe up or double tap to open" : "Swipe down or double tap to close") : undefined
+        }
+        onAccessibilityTap={hasRecipes ? () => setPanelCollapsed(!isCollapsed) : undefined}
+      >
+        {hasRecipes && <View style={styles.pill} />}
+        <Text
+          style={[
+            styles.label,
+            { color: isCollapsed ? muted : textColor, alignSelf: isCollapsed ? "center" : "flex-start" },
+          ]}
+        >
+          {isCollapsed ? "Suggest recipes" : "Chef's request (optional)"}
+        </Text>
+      </View>
+      {!isCollapsed && (
+        <>
       <TextInput
         style={[styles.input, { color: textColor, borderColor: dark ? "#555" : "#999" }]}
         placeholder="e.g. something quick and spicy"
@@ -119,12 +193,16 @@ export function RecipeSuggester({ ingredients }: { ingredients: string[] }) {
           ))}
         </ScrollView>
       )}
-    </View>
+        </>
+      )}
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   panel: { paddingHorizontal: 20, paddingVertical: 10 },
+  grabber: { paddingBottom: 4 },
+  pill: { alignSelf: "center", width: 40, height: 5, borderRadius: 3, backgroundColor: "#8e8e93", marginBottom: 8 },
   label: { fontWeight: "600", marginBottom: 4 },
   input: { borderWidth: 1, padding: 10 },
   counter: { fontSize: 12, textAlign: "right", marginTop: 2, marginBottom: 4 },

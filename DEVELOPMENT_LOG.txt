@@ -32,8 +32,9 @@ Git rules (from claude.md in the project root, written by the user)
 VERSION INDEX
 -------------
   Tag    Commit    Date        Summary
-  1.06   (this     2026-10-04  My Recipes: heart to save, Saved tab, delete mode, shared menu
-         commit)
+  1.07   (this     2026-10-04  Swipe-down recipe panel with gray pill; keyboard closes when
+         commit)               recipes arrive; ACTIVE_BUGS.txt added
+  1.06   81c186d   2026-10-04  My Recipes: heart to save, Saved tab, delete mode, shared menu
   1.05   1428c9e   2026-10-04  Pantry list saved on the phone (AsyncStorage)
   1.04   239c889   2026-10-03  AI recipe suggestions (Phase 3): server route + Claude Haiku
                                + "Suggest recipes" UI
@@ -44,7 +45,45 @@ VERSION INDEX
 
 
 ==============================================================================
-VERSION 1.06   (tag: 1.06, commit: the commit that contains this entry, 2026-10-04)
+VERSION 1.07   (tag: 1.07, commit: the commit that contains this entry, 2026-10-04)
+Swipe-down recipe panel with a gray pill, keyboard fix, active bugs list
+==============================================================================
+
+MAJOR CHANGES
+  - The recipe panel (chef's request + results) can be swiped down to hide and swiped
+    up (or tapped) to bring back, with an iOS-style gray pill at its top.
+  - The pill and the swipe only exist once there are recipes to look at.
+  - The keyboard now closes automatically when generation finishes, so the results are
+    no longer hidden behind it.
+  - New ACTIVE_BUGS.txt with the first (minor) bug.
+
+DETAILS
+  - src/components/recipe-suggester.tsx:
+      * Panel is an Animated.View; a PanResponder on the pill + label area drives it.
+        Open: dragging down follows the finger; release after a pull of more than 70 px
+        (or a fast flick) hides it, otherwise it springs back. Hidden: only a tap or an
+        upward swipe (more than 30 px) reopens it; dragging down does nothing.
+      * Hidden state shows a thin bar (pill + "Suggest recipes"). Typed request and
+        results are kept while hidden.
+      * hasRecipes gates everything: with no recipes there is no pill, no gesture and the
+        panel looks and behaves as it did in 1.06 (positions unchanged on purpose; no
+        background or corner changes).
+      * Accessibility: pill reads "Hide recipe panel" / "Show recipe panel" with
+        swipe/double-tap hints; double tap toggles.
+      * Keyboard.dismiss() runs when the request finishes (success or error), so the
+        panel settles at its normal height instead of staying squeezed above the
+        keyboard.
+  - ACTIVE_BUGS.txt (new): minor bugs get short entries, major bugs get details; fixed
+    bugs move to a FIXED section with the tag that fixed them. BUG-001: the same recipe
+    can be saved to the Saved list more than once (minor, user-friendliness fix wanted;
+    check is in src/lib/saved-recipes.ts).
+  - History: a first version of the pill/sheet (with a raised background) was tried
+    during 1.06 work and reverted; this version keeps the original panel position.
+  - Verified: typecheck. Not yet checked on a device when written.
+
+
+==============================================================================
+VERSION 1.06   (tag: 1.06, commit: 81c186d, 2026-10-04)
 My Recipes: save recipes with a heart, Saved tab, delete mode
 ==============================================================================
 

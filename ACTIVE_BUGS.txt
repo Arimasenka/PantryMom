@@ -1,0 +1,21 @@
+PANTRYMOM - ACTIVE BUGS
+=======================
+
+Bugs found but not fixed yet. Minor ones get a short entry; only major bugs get details.
+When one is fixed, move it to FIXED with the version tag that fixed it (tags are in
+DEVELOPMENT_LOG.txt).
+
+
+ACTIVE
+------
+
+BUG-001  Duplicate recipes in saved recipes list   (minor, user-friendliness)
+  Reported 2026-10-04 (as of 1.06). The same recipe can be saved to the list more than
+  once. Wanted: it should not be possible to save the same recipe twice.
+  Where: src/lib/saved-recipes.ts (recipeId / saveRecipe do the duplicate check).
+
+
+FIXED
+-----
+
+(none yet)
