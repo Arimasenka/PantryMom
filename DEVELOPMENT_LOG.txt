@@ -32,8 +32,10 @@ Git rules (from claude.md in the project root, written by the user)
 VERSION INDEX
 -------------
   Tag    Commit    Date        Summary
-  1.04   (this     2026-10-03  AI recipe suggestions (Phase 3): server route + Claude Haiku
-         commit)               + "Suggest recipes" UI
+  1.05   (this     2026-10-04  Pantry list saved on the phone (AsyncStorage)
+         commit)
+  1.04   239c889   2026-10-03  AI recipe suggestions (Phase 3): server route + Claude Haiku
+                               + "Suggest recipes" UI
   1.03   7c2f37a   2026-10-03  Swipe-to-delete rebuilt on gesture-handler, iOS-style
   1.02   cc1cb18   2026-10-03  List mode, remove mode (menu), first swipe-to-delete, haptics
   1.01   cfd42e3   2026-09-30  Pinch zoom, pan, full-width graph
@@ -41,7 +43,33 @@ VERSION INDEX
 
 
 ==============================================================================
-VERSION 1.04   (tag: 1.04, commit: the commit that contains this entry, 2026-10-03)
+VERSION 1.05   (tag: 1.05, commit: the commit that contains this entry, 2026-10-04)
+Persist the ingredient list on the phone
+==============================================================================
+
+MAJOR CHANGES
+  - The pantry now survives closing the app: the ingredient list is saved on the phone
+    and loaded when the app opens.
+  - Storage errors never crash the app.
+
+DETAILS
+  - Package added: @react-native-async-storage/async-storage 2.2.0 (via npx expo
+    install; works in Expo Go on SDK 57).
+  - src/lib/pantry-storage.ts (new): loadPantry() / savePantry() under the key
+    "pantry.ingredients". Both wrapped in try/catch; a failed or corrupted load returns
+    an empty list, a failed save is logged and ignored. Loaded data is checked to be a
+    list of non-empty strings.
+  - src/app/index.tsx: a load effect on first render (merges with anything typed before
+    loading finished) and a save effect on every list change. Saving waits for a
+    "loaded" flag so the empty starting list cannot overwrite the saved one.
+  - Scope kept narrow on purpose: only the ingredient names are stored (no quantities
+    or stock tracking). Recipes are not saved yet.
+  - Verified: typecheck, full iOS export builds with the storage code. Not yet checked
+    on a device when written.
+
+
+==============================================================================
+VERSION 1.04   (tag: 1.04, commit: 239c889, 2026-10-03)
 Add AI recipe suggestions (Phase 3 reattempt)
 ==============================================================================
 
@@ -237,7 +265,6 @@ Working notes
 
 
 OPEN ITEMS / NEXT IDEAS
-  - Persist the pantry to the phone (AsyncStorage) so it survives closing the app.
   - Recipe suggestions: let the user save a suggested recipe; consider caching or
     streaming results; later try a stronger model than the cheap Haiku test model.
   - Saved recipes, grocery entry shortcuts, recipe criteria prompts, user preferences.

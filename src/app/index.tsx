@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Button, FlatList, KeyboardAvoidingView, LayoutAnimation, Platform, Pressable, StyleSheet,
   Text, TextInput,
@@ -10,6 +10,7 @@ import { IngredientGraph } from "@/components/ingredient-graph";
 import { RecipeSuggester } from "@/components/recipe-suggester";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { ingredientIcon, ingredientKey } from "@/lib/ingredient-data";
+import { loadPantry, savePantry } from "@/lib/pantry-storage";
 
 type ViewMode = "map" | "list";
 
@@ -21,6 +22,22 @@ export default function Index() {
   const [mode, setMode] = useState<ViewMode>("map");
   const [menuOpen, setMenuOpen] = useState(false);
   const [removeMode, setRemoveMode] = useState(false);
+  const [loaded, setLoaded] = useState(false); // true once the saved list has been read
+
+  // When the app opens, read the saved list. If you typed something before it finished
+  // loading, keep both.
+  useEffect(() => {
+    loadPantry().then((saved) => {
+      setIngredients((current) => [...saved, ...current.filter((i) => !saved.includes(i))]);
+      setLoaded(true);
+    });
+  }, []);
+
+  // Save every time the list changes (but not before the load finishes, or the empty
+  // starting list would overwrite what was saved).
+  useEffect(() => {
+    if (loaded) savePantry(ingredients);
+  }, [ingredients, loaded]);
 
   function addIngredient() {
     const key = ingredientKey(ingredient);
