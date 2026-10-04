@@ -1,12 +1,13 @@
 import { useState } from "react";
 import {
-  Button, FlatList, LayoutAnimation, Pressable, StyleSheet,
+  Button, FlatList, KeyboardAvoidingView, LayoutAnimation, Platform, Pressable, StyleSheet,
   Text, TextInput,
   useColorScheme,
   View,
 } from "react-native";
 
 import { IngredientGraph } from "@/components/ingredient-graph";
+import { RecipeSuggester } from "@/components/recipe-suggester";
 import { SwipeToDeleteRow } from "@/components/swipe-to-delete-row";
 import { ingredientIcon, ingredientKey } from "@/lib/ingredient-data";
 
@@ -48,7 +49,10 @@ export default function Index() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: dark ? "#000" : "#fff" }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: dark ? "#000" : "#fff" }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       {/* Tapping anywhere outside the menu closes it. */}
       {menuOpen && <Pressable style={styles.backdrop} onPress={() => setMenuOpen(false)} />}
 
@@ -124,7 +128,8 @@ export default function Index() {
           )}
         />
       )}
-    </View>
+      <RecipeSuggester ingredients={ingredients} />
+    </KeyboardAvoidingView>
   );
 }
 

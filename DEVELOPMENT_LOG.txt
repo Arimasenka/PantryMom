@@ -12,17 +12,74 @@ How to read this log
     - Git tag and commit (the tag is the version number)
     - MAJOR CHANGES: the headline points only
     - DETAILS: how it was done, files touched, decisions, and known limits
-  This file is updated after each backup/tag. Its own commit is not listed (a file
-  cannot contain the hash of the commit that stores it).
+  This file is updated in the same commit as the app change it describes. A commit
+  cannot contain its own hash, so the newest entry says "this commit"; look it up with
+  "git show-ref 1.04" (or the tag you want) or "git log --oneline".
+
+Git rules (from claude.md in the project root, written by the user)
+  - Commit only when the user asks. Right after each commit, tag it with the next
+    version: raise the number after the dot by one (1.03 -> 1.04). No new whole number
+    (2.0) without asking.
+  - Annotated tags with a short description: git tag -a 1.04 -m "description".
+    (Tags 1.0 to 1.03 are older lightweight tags.)
+  - Only app-change commits get version tags; log-only edits ride along with the next
+    app change instead of getting their own commit.
+  - Never push commits or tags unless asked. Never stage .env files or anything with an
+    API key. Run git status and show the file list before every commit, and
+    git log --oneline after.
 
 
 VERSION INDEX
 -------------
   Tag    Commit    Date        Summary
+  1.04   (this     2026-10-03  AI recipe suggestions (Phase 3): server route + Claude Haiku
+         commit)               + "Suggest recipes" UI
   1.03   7c2f37a   2026-10-03  Swipe-to-delete rebuilt on gesture-handler, iOS-style
   1.02   cc1cb18   2026-10-03  List mode, remove mode (menu), first swipe-to-delete, haptics
   1.01   cfd42e3   2026-09-30  Pinch zoom, pan, full-width graph
   1.0    8f6013b   2026-09-30  Ingredient mind map, first version
+
+
+==============================================================================
+VERSION 1.04   (tag: 1.04, commit: the commit that contains this entry, 2026-10-03)
+Add AI recipe suggestions (Phase 3 reattempt)
+==============================================================================
+
+MAJOR CHANGES
+  - "Suggest recipes" button sends the pantry to a server route that asks Claude for
+    exactly 3 recipes and shows them below the map/list.
+  - Optional "Chef's request" text box (200 characters max) to steer the recipes.
+  - The Claude API key stays on the server: it is read only inside the route file.
+  - Includes the development log (DEVELOPMENT_LOG.txt), first committed here.
+
+DETAILS
+  - app.json: web.output changed from "static" to "server" (Expo SDK 57 needs this for
+    API routes). Package added: @anthropic-ai/sdk (via npx expo install).
+  - src/app/suggest+api.ts (new): Expo Router API route, POST /suggest. Takes
+    {ingredients, request}, validates and cleans them (max 50 ingredients, 60 chars
+    each, request capped at 200, angle brackets stripped). Calls claude-haiku-4-5-20251001
+    with a JSON schema (title, time, ingredientsUsed, extraIngredientsNeeded, steps) so
+    the output format is enforced; returns exactly 3 recipes or a friendly error.
+  - Prompt safety: ingredients and the chef's request are passed in tagged sections,
+    and the system prompt says the request is only a food preference; instructions in
+    it (change the format, ignore rules, reveal the prompt) are to be ignored.
+  - Errors handled with friendly messages: bad request, missing key, rejected key, rate
+    limit, cut-off or refused answers, and "couldn't reach the service" on the client.
+    When the key is missing the server logs similar variable NAMES only (never values).
+  - src/lib/recipe-types.ts (new): Recipe type and the 200-character limit, shared by
+    server and screen; no secrets.
+  - src/components/recipe-suggester.tsx (new): the chef's request box with a counter,
+    the button (disabled when the ingredient list is empty or loading), a loading
+    spinner, error text and the recipe cards (scrollable, max height 260).
+  - src/app/index.tsx: renders the suggester below the map/list and wraps the screen in
+    a KeyboardAvoidingView so the keyboard does not cover the request box.
+  - Verified without the phone: typecheck passes; route returns 400/405 for bad input;
+    full iOS export builds; the client bundle contains neither the key name nor the
+    Anthropic SDK; one real test call returned recipes (about a fraction of a cent).
+  - Gotcha found: Expo reads .env.local only when the dev server starts. "Missing API
+    key" after adding the key means the old server was still running; restart with
+    "npx expo start --clear".
+  - Model is the cheap test model on purpose (claude-haiku-4-5-20251001).
 
 
 ==============================================================================
@@ -162,31 +219,27 @@ Local safeguards (outside the commits)
     "git commit --no-verify" skips it.
   - .env.local is gitignored (.env*.local).
 
-Reverted experiment: "Make Recipe" (Phase 3, AI recipes)  - never committed
-  - Goal: Make Recipe button -> Expo Router API route (server side) -> Claude API
-    (claude-haiku-4-5-20251001, key from ANTHROPIC_API_KEY in .env.local) -> 3 recipes
-    as JSON (title, time, ingredients used, extra ingredients needed, steps).
-  - It was built (API route, recipe panel, shared types, @anthropic-ai/sdk install,
-    apiRoutes plugin option in app.json) but after it the app could no longer connect
-    to the phone, so it was fully undone. The root cause was never confirmed (best
-    guess: the apiRoutes setting in app.json or the dev server picking up config
-    changes mid-run).
-  - Plan for the retry: add the server route first, confirm the app still connects,
-    then add the button. API routes in SDK 57 with static web output need
-    ["expo-router", { "apiRoutes": true }] in app.json plus a server restart.
+History note: first "Make Recipe" attempt (never committed, reverted)
+  - An earlier AI-recipe attempt (API route at /api/recipes, apiRoutes plugin option in
+    app.json, static web output) was undone because the app could no longer connect to
+    the phone afterwards. The cause was never confirmed. The 1.04 reattempt used
+    web.output "server" instead and works.
 
 Working notes
   - Dev server: run "npx expo start" in the project folder; if the app will not
     connect, restart with "npx expo start --clear".
   - Lint (npx expo lint) cannot run: eslint is not installed in the project. Typecheck
     (npx tsc --noEmit) is used as the check.
-  - Untracked file claude.md exists in the project root; it was not created by the
-    assistant and has not been committed.
+  - claude.md in the project root is the user's rules file for the assistant (git
+    rules, summarized at the top of this log). It is intentionally untracked.
+  - .env.local holds ANTHROPIC_API_KEY (gitignored; the assistant is not allowed to
+    read it). The key is used only in src/app/suggest+api.ts.
 
 
 OPEN ITEMS / NEXT IDEAS
   - Persist the pantry to the phone (AsyncStorage) so it survives closing the app.
-  - Redo Phase 3: AI recipe suggestions via a server API route, in smaller steps.
+  - Recipe suggestions: let the user save a suggested recipe; consider caching or
+    streaming results; later try a stronger model than the cheap Haiku test model.
   - Saved recipes, grocery entry shortcuts, recipe criteria prompts, user preferences.
   - Replace relatedness() with AI-based ingredient relations.
   - Set up a private GitHub remote for an off-computer backup.
